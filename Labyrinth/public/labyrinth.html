@@ -1,0 +1,2856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LABYRINTH — Blind Maze Duel</title>
+  <meta name="description" content="A high-stakes two-player pass-and-play blind maze duel. Build secret mazes with 20 walls and duel blind to reach the exit." />
+  <meta property="og:title" content="LABYRINTH — Blind Maze Duel" />
+  <meta property="og:description" content="A high-stakes two-player pass-and-play blind maze duel. Build secret mazes with 20 walls and duel blind to reach the exit." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- Typography: Cinzel for high-stakes titles, IBM Plex Mono for coordinates and logs -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       0. DESIGN TOKENS (Dark Gambling Den / Kakerou)
+       ========================================================================== */
+    :root {
+      --bg: #0b0b0d;
+      --panel: #141216;
+      --panel-2: #1b181d;
+      --line: #2a252c;
+      --crimson: #8b0a1a;
+      --crimson-bright: #c0182f;
+      --gold: #c9a24a;
+      --gold-dim: #8a6f33;
+      --ink: #e8e2d4;
+      --muted: #8d867a;
+      --danger: #c0182f;
+      --ok: #6fae75;
+
+      --font-display: 'Cinzel', 'Playfair Display', Georgia, serif;
+      --font-mono: 'IBM Plex Mono', 'Space Mono', ui-monospace, Menlo, monospace;
+    }
+
+    /* Base Reset & Felt Canvas */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      background-color: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Subtle felt texture, radial spotlight & vignette */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 30%, rgba(201, 162, 74, 0.08) 0%, rgba(11, 11, 13, 0) 70%),
+        radial-gradient(circle at 50% 90%, rgba(139, 10, 26, 0.06) 0%, rgba(11, 11, 13, 0) 65%);
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.9);
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+      z-index: 0;
+    }
+
+    #app {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 1rem 1rem 3rem 1rem;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    /* Common Components & Typography */
+    h1, h2, h3 {
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 700;
+      color: var(--ink);
+      text-align: center;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 6vw, 3rem);
+      color: var(--gold);
+      text-shadow: 0 0 20px rgba(201, 162, 74, 0.25);
+    }
+
+    .kicker {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--gold-dim);
+      margin-bottom: 0.4rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 1rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      text-align: center;
+      margin-top: 0.35rem;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0.65rem 1.4rem;
+      background: var(--panel-2);
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border: 1px solid var(--gold-dim);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 180ms ease;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--gold-dim);
+      color: #0b0b0d;
+      border-color: var(--gold);
+      box-shadow: 0 0 14px rgba(201, 162, 74, 0.35);
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--gold);
+      outline-offset: 2px;
+    }
+
+    .btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      border-color: var(--line);
+    }
+
+    .btn-gold {
+      background: linear-gradient(135deg, #a68436 0%, #c9a24a 100%);
+      color: #0b0b0d;
+      border-color: var(--gold);
+      font-weight: 700;
+    }
+
+    .btn-gold:hover:not(:disabled) {
+      background: linear-gradient(135deg, #c9a24a 0%, #e2be67 100%);
+      box-shadow: 0 0 20px rgba(201, 162, 74, 0.5);
+    }
+
+    .btn-crimson {
+      background: linear-gradient(135deg, var(--crimson) 0%, var(--crimson-bright) 100%);
+      color: #ffffff;
+      border-color: var(--crimson-bright);
+    }
+
+    .btn-crimson:hover:not(:disabled) {
+      background: #d81c35;
+      box-shadow: 0 0 16px rgba(192, 24, 47, 0.5);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--line);
+      color: var(--muted);
+    }
+
+    .btn-ghost:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--ink);
+      border-color: var(--gold-dim);
+    }
+
+    .btn-icon {
+      width: 44px;
+      height: 44px;
+      min-height: 44px;
+      padding: 0;
+      border-radius: 4px;
+    }
+
+    /* Text Inputs */
+    .input-field {
+      min-height: 48px;
+      background: #0f0d11;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 0.65rem 1rem;
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+      width: 100%;
+    }
+
+    .input-field:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 10px rgba(201, 162, 74, 0.25);
+    }
+
+    .input-field::placeholder {
+      color: rgba(141, 134, 122, 0.6);
+      font-size: 0.9rem;
+    }
+
+    /* Top Utility Bar */
+    .top-bar {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(42, 37, 44, 0.6);
+    }
+
+    .top-bar-brand {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      letter-spacing: 0.15em;
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    /* Board Container */
+    .board-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 540px;
+      aspect-ratio: 1 / 1;
+      margin: 0.5rem auto 1rem auto;
+      border: 1px solid rgba(138, 111, 51, 0.4);
+      background: #0e0c10;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(0, 0, 0, 0.8);
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .board-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      user-select: none;
+    }
+
+    /* Wall / Passage SVG Styling */
+    .svg-cell {
+      fill: #141216;
+      stroke: var(--gold-dim);
+      stroke-width: 0.65;
+      stroke-opacity: 0.22;
+      transition: fill 150ms ease;
+    }
+
+    .svg-cell:hover {
+      fill: #19161c;
+    }
+
+    .svg-grid-border {
+      fill: none;
+      stroke: var(--gold-dim);
+      stroke-width: 1.5;
+      stroke-opacity: 0.5;
+    }
+
+    .svg-wall {
+      stroke: var(--crimson-bright);
+      stroke-width: 7;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 4px rgba(192, 24, 47, 0.7));
+    }
+
+    .svg-wall-flash {
+      animation: wallReveal 400ms ease-out forwards;
+    }
+
+    @keyframes wallReveal {
+      0% {
+        stroke: #ffffff;
+        stroke-width: 10;
+        filter: drop-shadow(0 0 12px #ffffff);
+      }
+      50% {
+        stroke: #ff526a;
+        stroke-width: 8;
+        filter: drop-shadow(0 0 8px rgba(255, 82, 106, 0.9));
+      }
+      100% {
+        stroke: var(--crimson-bright);
+        stroke-width: 7;
+        filter: drop-shadow(0 0 4px rgba(192, 24, 47, 0.7));
+      }
+    }
+
+    .svg-passage {
+      stroke: var(--gold);
+      stroke-width: 2.5;
+      stroke-dasharray: 6 5;
+      stroke-linecap: round;
+      opacity: 0.85;
+    }
+
+    .svg-token-outer {
+      fill: #141216;
+      stroke: var(--gold);
+      stroke-width: 3.5;
+      filter: drop-shadow(0 0 8px rgba(201, 162, 74, 0.75));
+      transition: cx 180ms ease, cy 180ms ease;
+    }
+
+    .svg-token-inner {
+      fill: var(--gold);
+      transition: cx 180ms ease, cy 180ms ease;
+    }
+
+    .svg-coord-label {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      fill: var(--gold-dim);
+      text-anchor: middle;
+      dominant-baseline: central;
+      letter-spacing: 0.05em;
+    }
+
+    .svg-tag-rect {
+      stroke-width: 1.2;
+      rx: 2;
+    }
+
+    .svg-tag-text {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      text-anchor: middle;
+      dominant-baseline: central;
+      letter-spacing: 0.08em;
+    }
+
+    /* Message / Status Bar */
+    .status-msg {
+      width: 100%;
+      min-height: 24px;
+      font-size: 0.875rem;
+      text-align: center;
+      margin: 0.4rem 0 0.8rem 0;
+      padding: 0.35rem 0.5rem;
+      border-radius: 3px;
+      color: var(--ink);
+      transition: opacity 150ms ease;
+    }
+
+    .status-msg.error {
+      color: #ff6b7e;
+      background: rgba(192, 24, 47, 0.12);
+      border: 1px solid rgba(192, 24, 47, 0.3);
+    }
+
+    .status-msg.success {
+      color: #8ae392;
+      background: rgba(111, 174, 117, 0.12);
+      border: 1px solid rgba(111, 174, 117, 0.3);
+    }
+
+    .status-msg.blocked {
+      color: #ff526a;
+      background: rgba(192, 24, 47, 0.18);
+      border: 1px solid rgba(192, 24, 47, 0.5);
+      font-weight: 600;
+    }
+
+    /* Input Bar */
+    .action-bar {
+      width: 100%;
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.8rem;
+    }
+
+    /* Wall Chips */
+    .chips-panel {
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 0.6rem;
+      margin-bottom: 0.8rem;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .chips-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    .wall-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.5rem;
+      background: #1e1a22;
+      border: 1px solid rgba(192, 24, 47, 0.4);
+      border-radius: 3px;
+      font-size: 0.75rem;
+      color: #f0c5cb;
+    }
+
+    .wall-chip-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      line-height: 1;
+      padding: 0 0.15rem;
+      transition: color 150ms ease;
+    }
+
+    .wall-chip-btn:hover {
+      color: #ff526a;
+    }
+
+    /* Move Log */
+    .log-panel {
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 0.6rem 0.8rem;
+      margin-top: 0.5rem;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    .log-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--gold-dim);
+      margin-bottom: 0.4rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .log-items {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .log-entry {
+      font-size: 0.82rem;
+      letter-spacing: 0.05em;
+      padding: 0.15rem 0;
+      border-bottom: 1px dashed rgba(42, 37, 44, 0.4);
+    }
+
+    .log-entry.open {
+      color: var(--gold);
+    }
+
+    .log-entry.blocked {
+      color: var(--crimson-bright);
+    }
+
+    /* BLOCKED Ink-Stamp Overlay */
+    .blocked-stamp-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(11, 11, 13, 0.65);
+      z-index: 20;
+      cursor: pointer;
+    }
+
+    .ink-stamp {
+      font-family: var(--font-display);
+      font-size: clamp(2.2rem, 8vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: 0.25em;
+      color: var(--crimson-bright);
+      border: 4px solid var(--crimson-bright);
+      padding: 0.4rem 1.4rem;
+      text-transform: uppercase;
+      transform: rotate(-12deg);
+      box-shadow: 0 0 25px rgba(192, 24, 47, 0.8), inset 0 0 15px rgba(192, 24, 47, 0.4);
+      animation: inkStampAnim 280ms cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+      background: rgba(20, 18, 22, 0.9);
+      user-select: none;
+    }
+
+    @keyframes inkStampAnim {
+      0% {
+        opacity: 0;
+        transform: scale(2.5) rotate(-24deg);
+      }
+      60% {
+        opacity: 1;
+        transform: scale(0.95) rotate(-10deg);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) rotate(-12deg);
+      }
+    }
+
+    /* Full-screen Handoff Privacy Curtain */
+    .handoff-curtain {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #09090b;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      z-index: 100;
+      text-align: center;
+      animation: curtainFade 250ms ease-out;
+    }
+
+    @keyframes curtainFade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .curtain-title {
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      color: var(--gold);
+      margin-bottom: 1rem;
+      max-width: 500px;
+    }
+
+    .curtain-desc {
+      color: var(--muted);
+      font-size: 1rem;
+      margin-bottom: 2.5rem;
+      max-width: 420px;
+      letter-spacing: 0.05em;
+    }
+
+    /* Coin Flip Screen */
+    .coin-wrapper {
+      perspective: 1000px;
+      margin: 2rem auto;
+      width: 140px;
+      height: 140px;
+    }
+
+    .coin {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      border-radius: 50%;
+      animation: coinSpin 1.2s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+    }
+
+    .coin-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      backface-visibility: hidden;
+      border: 3px solid var(--gold);
+      background: radial-gradient(circle, #e2be67 0%, #a68436 70%, #5d4617 100%);
+      color: #0b0b0d;
+      box-shadow: 0 0 25px rgba(201, 162, 74, 0.5);
+    }
+
+    .coin-face.back {
+      transform: rotateY(180deg);
+      background: radial-gradient(circle, #e8a6a6 0%, #8b0a1a 70%, #4a030c 100%);
+      border-color: #ff526a;
+      color: #ffffff;
+      box-shadow: 0 0 25px rgba(192, 24, 47, 0.5);
+    }
+
+    .coin-symbol {
+      font-family: var(--font-display);
+      font-size: 2.4rem;
+      font-weight: 800;
+    }
+
+    .coin-tag {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+    }
+
+    @keyframes coinSpin {
+      0% { transform: rotateY(0deg) scale(0.8); }
+      50% { transform: rotateY(900deg) scale(1.15); }
+      100% { transform: rotateY(var(--coin-target-deg, 1800deg)) scale(1); }
+    }
+
+    /* Rules Screen */
+    .rules-panel {
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    }
+
+    .rules-quickstart {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-bottom: 1.25rem;
+      padding: 1rem;
+      background: #0e0c10;
+      border: 1px solid var(--gold-dim);
+      border-radius: 4px;
+    }
+
+    .rules-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: var(--ink);
+    }
+
+    .rules-step-badge {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--gold-dim);
+      color: #0b0b0d;
+      font-weight: 700;
+      font-size: 0.75rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    .rules-section {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(42, 37, 44, 0.6);
+    }
+
+    .rules-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0.5rem;
+    }
+
+    .rules-heading {
+      font-size: 1.05rem;
+      color: var(--gold);
+      text-align: left;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .rules-text {
+      color: var(--ink);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-bottom: 0.5rem;
+    }
+
+    .rules-callout-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin: 0.75rem 0;
+    }
+
+    @media (max-width: 520px) {
+      .rules-callout-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .rules-card-open {
+      background: rgba(111, 174, 117, 0.08);
+      border: 1px solid rgba(111, 174, 117, 0.4);
+      border-radius: 4px;
+      padding: 0.85rem;
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+
+    .rules-card-blocked {
+      background: rgba(192, 24, 47, 0.08);
+      border: 1px solid rgba(192, 24, 47, 0.4);
+      border-radius: 4px;
+      padding: 0.85rem;
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+
+    .rules-card-title {
+      font-family: var(--font-display);
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+    }
+
+    .rules-card-open .rules-card-title {
+      color: #8ae392;
+    }
+
+    .rules-card-blocked .rules-card-title {
+      color: #ff6b7e;
+    }
+
+    .rules-note-box {
+      background: #19161c;
+      border: 1px solid rgba(201, 162, 74, 0.3);
+      border-radius: 4px;
+      padding: 0.75rem 0.9rem;
+      margin: 0.75rem 0;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: var(--ink);
+    }
+
+    .rules-diagram {
+      margin: 1rem auto;
+      max-width: 320px;
+      background: #0f0d11;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 0.5rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Game Over Screen Reveal */
+    .gameover-mazes {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    @media (min-width: 600px) {
+      .gameover-mazes {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .maze-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .maze-card-title {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      color: var(--gold);
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+
+    .stat-badge {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+
+    /* Modal dialog */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 90;
+      padding: 1rem;
+    }
+
+    .modal-box {
+      background: var(--panel);
+      border: 1px solid var(--gold-dim);
+      border-radius: 6px;
+      padding: 1.5rem;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9);
+    }
+
+    /* Prefers-reduced-motion accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      .coin {
+        animation: none !important;
+        transform: rotateY(var(--coin-target-deg, 0deg)) !important;
+      }
+      .ink-stamp {
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" role="main"></div>
+
+  <!-- Vanilla JS Engine -->
+  <script>
+    (function () {
+      'use strict';
+
+      /* ==========================================================================
+         1. CONSTANTS & DATA MODEL (Section 4 & 5)
+         ========================================================================== */
+      const WALL_COUNT = 20;
+      const SIZE = 6;
+      const COLS = 'ABCDEF';
+
+      // State machine root
+      let state = {
+        phase: 'TITLE', // 'TITLE' | 'RULES' | 'HANDOFF' | 'BUILD' | 'COINFLIP' | 'SOLVE' | 'GAMEOVER'
+        names: ['Player 1', 'Player 2'],
+        mazes: [
+          { entrance: null, exit: null, walls: new Set() },
+          { entrance: null, exit: null, walls: new Set() }
+        ],
+        solves: [
+          { pos: null, knownOpen: new Set(), knownWalls: new Set(), guesses: 0, log: [] },
+          { pos: null, knownOpen: new Set(), knownWalls: new Set(), guesses: 0, log: [] }
+        ],
+        current: 0,       // whose turn (building: 0 or 1; solving: 0 or 1)
+        firstSolver: 0,   // decided by coin flip
+        winner: null,     // 0 or 1
+        returnTo: null,   // phase to return to after closing Rules screen
+        handoffTarget: 0, // player index to hand off to
+        handoffNextPhase: 'BUILD',
+        blockedStampActive: false, // momentary visual indicator for blocked moves
+        currentMessage: { text: '', type: 'normal' }
+      };
+
+      /* ==========================================================================
+         2. CORE PURE FUNCTIONS & HELPERS (Section 3 & 10)
+         ========================================================================== */
+      /**
+       * Converts 0-indexed row (0..5) and col (0..5) to square label e.g. "A1"
+       */
+      function label(row, col) {
+        if (col < 0 || col >= SIZE || row < 0 || row >= SIZE) return null;
+        return COLS[col] + (row + 1);
+      }
+
+      /**
+       * Parses square string like "C3" into { row, col, label }. Returns null if invalid.
+       */
+      function parse(str) {
+        if (!str || typeof str !== 'string') return null;
+        const trimmed = str.trim().toUpperCase();
+        const match = trimmed.match(/^([A-F])([1-6])$/);
+        if (!match) return null;
+        const col = COLS.indexOf(match[1]);
+        const row = parseInt(match[2], 10) - 1;
+        return { row, col, label: match[1] + match[2] };
+      }
+
+      /**
+       * Determines if two square labels are orthogonally adjacent (up/down/left/right only).
+       */
+      function isAdjacent(labelA, labelB) {
+        const pa = parse(labelA);
+        const pb = parse(labelB);
+        if (!pa || !pb) return false;
+        const dRow = Math.abs(pa.row - pb.row);
+        const dCol = Math.abs(pa.col - pb.col);
+        return (dRow === 1 && dCol === 0) || (dRow === 0 && dCol === 1);
+      }
+
+      /**
+       * Returns normalized edge key: two labels sorted alphabetically and joined by "-"
+       * e.g. edgeKey("B3", "A3") -> "A3-B3"
+       */
+      function edgeKey(labelA, labelB) {
+        const a = labelA.trim().toUpperCase();
+        const b = labelB.trim().toUpperCase();
+        const sorted = [a, b].sort();
+        return `${sorted[0]}-${sorted[1]}`;
+      }
+
+      /**
+       * Returns true if wall exists in the given set
+       */
+      function hasWall(wallsSet, labelA, labelB) {
+        if (!wallsSet) return false;
+        return wallsSet.has(edgeKey(labelA, labelB));
+      }
+
+      /**
+       * Returns list of orthogonal neighbor square labels for a given square
+       */
+      function neighbors(cellLabel) {
+        const p = parse(cellLabel);
+        if (!p) return [];
+        const res = [];
+        const deltas = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        for (let i = 0; i < deltas.length; i++) {
+          const nr = p.row + deltas[i][0];
+          const nc = p.col + deltas[i][1];
+          if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE) {
+            res.push(label(nr, nc));
+          }
+        }
+        return res;
+      }
+
+      /**
+       * Generates all 60 possible edges on the 6x6 grid
+       */
+      function getAllEdges() {
+        const edges = [];
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            const cur = label(r, c);
+            if (c < SIZE - 1) {
+              edges.push(edgeKey(cur, label(r, c + 1)));
+            }
+            if (r < SIZE - 1) {
+              edges.push(edgeKey(cur, label(r + 1, c)));
+            }
+          }
+        }
+        return edges;
+      }
+
+      /**
+       * Breadth-First Search verifying solvability between entrance and exit
+       */
+      function bfsSolvable(entrance, exit, wallsSet) {
+        if (!entrance || !exit || entrance === exit) return false;
+        const queue = [entrance];
+        const visited = new Set([entrance]);
+
+        while (queue.length > 0) {
+          const cur = queue.shift();
+          if (cur === exit) return true;
+          const neighs = neighbors(cur);
+          for (let i = 0; i < neighs.length; i++) {
+            const n = neighs[i];
+            const ek = edgeKey(cur, n);
+            if (!wallsSet.has(ek) && !visited.has(n)) {
+              visited.add(n);
+              queue.push(n);
+            }
+          }
+        }
+        return false;
+      }
+
+      /**
+       * Generates a guaranteed valid, solvable random maze with exactly WALL_COUNT walls
+       */
+      function randomMaze() {
+        const allCells = [];
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            allCells.push(label(r, c));
+          }
+        }
+        // Shuffle cells to pick entrance and exit
+        const shuffled = [...allCells].sort(() => Math.random() - 0.5);
+        const ent = shuffled[0];
+        const pEnt = parse(ent);
+        // Ensure entrance and exit have distance >= 3
+        const candidates = shuffled.slice(1).filter(c => {
+          const pC = parse(c);
+          return (Math.abs(pC.row - pEnt.row) + Math.abs(pC.col - pEnt.col)) >= 3;
+        });
+        const ext = candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : shuffled[1];
+
+        const walls = new Set();
+        const allEdges = getAllEdges().sort(() => Math.random() - 0.5);
+
+        for (let i = 0; i < allEdges.length; i++) {
+          const edge = allEdges[i];
+          walls.add(edge);
+          if (!bfsSolvable(ent, ext, walls)) {
+            walls.delete(edge);
+          }
+          if (walls.size === WALL_COUNT) {
+            break;
+          }
+        }
+
+        // Safety fallback: if under 20 walls due to order, recurse
+        if (walls.size < WALL_COUNT) {
+          return randomMaze();
+        }
+
+        return { entrance: ent, exit: ext, walls };
+      }
+
+      /**
+       * Parses wall input representation (e.g. "a3-b3", "a3 - b3", "a3–b3", "a3 b3")
+       */
+      function parseEdgeInput(str) {
+        if (!str || typeof str !== 'string') {
+          return { ok: false, message: 'Unreadable. Use a square like B3.' };
+        }
+        // Replace en-dash, em-dash, and whitespace separators with a single hyphen
+        const cleaned = str.trim().toLowerCase()
+          .replace(/[\s\u2013\u2014]+/g, '-')
+          .replace(/-+/g, '-');
+
+        const parts = cleaned.split('-');
+        if (parts.length !== 2) {
+          return { ok: false, message: 'Walls sit between two neighboring squares, e.g. A3-B3.' };
+        }
+
+        const sq1 = parts[0];
+        const sq2 = parts[1];
+
+        // Check format
+        const p1 = parse(sq1);
+        const p2 = parse(sq2);
+        if (!p1 || !p2) {
+          return { ok: false, message: 'That square is not on the board.' };
+        }
+
+        if (!isAdjacent(p1.label, p2.label)) {
+          return { ok: false, message: 'Walls sit between two neighboring squares, e.g. A3-B3.' };
+        }
+
+        return { ok: true, edgeKey: edgeKey(p1.label, p2.label) };
+      }
+
+      /**
+       * Pure resolution of a move command in SOLVE mode (Section 7.5)
+       */
+      function resolveMove(targetStr, currentPos, opponentWalls, opponentExit) {
+        if (!targetStr || typeof targetStr !== 'string') {
+          return { status: 'MALFORMED', message: 'Unreadable. Use a square like B3.' };
+        }
+        const trimmed = targetStr.trim().toLowerCase();
+        // 1. Malformed check
+        if (!/^[a-f][1-6]$/.test(trimmed)) {
+          return { status: 'MALFORMED', message: 'Unreadable. Use a square like B3.' };
+        }
+        const target = trimmed.toUpperCase();
+
+        // 2. Not orthogonally adjacent
+        if (!isAdjacent(currentPos, target)) {
+          return { status: 'NOT_ADJACENT', message: 'You can only step to a neighboring square.' };
+        }
+
+        // 3. Wall blocks move
+        const ek = edgeKey(currentPos, target);
+        if (opponentWalls.has(ek)) {
+          return {
+            status: 'BLOCKED',
+            edge: ek,
+            target: target,
+            message: `BLOCKED. Wall between ${currentPos} and ${target}. Turn passes.`
+          };
+        }
+
+        // 4. Move succeeds
+        const isWin = (target === opponentExit);
+        return {
+          status: 'OPEN',
+          edge: ek,
+          target: target,
+          isWin: isWin,
+          message: isWin ? `Reaches the exit! Victory!` : `OPEN. You stand on ${target}.`
+        };
+      }
+
+      /* ==========================================================================
+         3. SELF-TEST RUNNER (Section 10)
+         ========================================================================== */
+      window.runSelfTests = function () {
+        console.group('%c[LABYRINTH TEST SUITE]', 'color: #c9a24a; font-weight: bold;');
+        let passed = 0;
+        let failed = 0;
+
+        function assert(condition, desc) {
+          if (condition) {
+            console.log(`%c[PASS]%c ${desc}`, 'color: #6fae75; font-weight: bold;', 'color: inherit;');
+            passed++;
+          } else {
+            console.error(`[FAIL] ${desc}`);
+            failed++;
+          }
+        }
+
+        // 1. edgeKey order independence
+        assert(edgeKey('A1', 'A2') === 'A1-A2', 'edgeKey A1-A2 normalizes');
+        assert(edgeKey('A2', 'A1') === 'A1-A2', 'edgeKey A2-A1 matches A1-A2 order-independently');
+        assert(edgeKey('b3', 'A3') === 'A3-B3', 'edgeKey case-insensitive and alphabetical');
+
+        // 2. isAdjacent tests
+        assert(isAdjacent('A1', 'A2') === true, 'A1 and A2 are adjacent (down)');
+        assert(isAdjacent('A1', 'B1') === true, 'A1 and B1 are adjacent (right)');
+        assert(isAdjacent('B2', 'B1') === true, 'B2 and B1 are adjacent (up)');
+        assert(isAdjacent('B2', 'A2') === true, 'B2 and A2 are adjacent (left)');
+        assert(isAdjacent('A1', 'B2') === false, 'A1 and B2 diagonal rejection');
+        assert(isAdjacent('A1', 'A1') === false, 'Same square rejection');
+        assert(isAdjacent('A1', 'A3') === false, 'Distance 2 square rejection');
+        assert(isAdjacent('A1', 'Z9') === false, 'Off-grid square rejection');
+
+        // 3. BFS Solvability tests
+        const emptyWalls = new Set();
+        assert(bfsSolvable('A1', 'F6', emptyWalls) === true, 'Empty board is solvable');
+
+        // Surround A1 with walls (A1-A2, A1-B1)
+        const trappedA1 = new Set(['A1-A2', 'A1-B1']);
+        assert(bfsSolvable('A1', 'F6', trappedA1) === false, 'Surrounded entrance is unsolvable');
+        assert(bfsSolvable('A1', 'A1', emptyWalls) === false, 'Entrance equal to exit is invalid');
+
+        // 4. resolveMove test cases
+        const testWalls = new Set(['C3-C4', 'C3-D3']);
+        const resMal = resolveMove('invalid', 'C3', testWalls, 'F6');
+        assert(resMal.status === 'MALFORMED', 'Invalid text rejected with MALFORMED');
+
+        const resDiag = resolveMove('D4', 'C3', testWalls, 'F6');
+        assert(resDiag.status === 'NOT_ADJACENT', 'Diagonal step rejected with NOT_ADJACENT');
+
+        const resFar = resolveMove('C1', 'C3', testWalls, 'F6');
+        assert(resFar.status === 'NOT_ADJACENT', 'Two-step leap rejected with NOT_ADJACENT');
+
+        const resBlocked = resolveMove('C4', 'C3', testWalls, 'F6');
+        assert(resBlocked.status === 'BLOCKED', 'Wall step resolved as BLOCKED');
+
+        const resOpen = resolveMove('B3', 'C3', testWalls, 'F6');
+        assert(resOpen.status === 'OPEN' && !resOpen.isWin, 'Open step resolved as OPEN without win');
+
+        const resWin = resolveMove('B3', 'C3', testWalls, 'B3');
+        assert(resWin.status === 'OPEN' && resWin.isWin, 'Step to exit resolved as win');
+
+        // 5. randomMaze test
+        const rm = randomMaze();
+        assert(rm.walls.size === WALL_COUNT, `randomMaze has exactly ${WALL_COUNT} walls (got ${rm.walls.size})`);
+        assert(rm.entrance !== rm.exit, 'randomMaze entrance differs from exit');
+        assert(bfsSolvable(rm.entrance, rm.exit, rm.walls) === true, 'randomMaze is guaranteed BFS solvable');
+
+        console.log(`%cTotal: ${passed} passed, ${failed} failed.`, 'font-weight: bold; color: #c9a24a;');
+        console.groupEnd();
+        return { passed, failed };
+      };
+
+      /* ==========================================================================
+         4. BEFOREUNLOAD LISTENER (Section 6)
+         ========================================================================== */
+      window.addEventListener('beforeunload', function (e) {
+        if (state.phase !== 'TITLE' && state.phase !== 'GAMEOVER') {
+          e.preventDefault();
+          e.returnValue = 'A duel is in progress. Leaving will forfeit the game.';
+          return e.returnValue;
+        }
+      });
+
+      /* ==========================================================================
+         5. SVG BOARD BUILDER (Section 9)
+         ========================================================================== */
+      /**
+       * Generates SVG board representation.
+       * @param {Object} options
+       * @param {string|null} options.entrance
+       * @param {string|null} options.exit
+       * @param {Set} options.visibleWalls
+       * @param {Set} options.visibleOpen
+       * @param {string|null} options.tokenPos
+       * @param {string|null} options.flashWall
+       * @param {boolean} options.clickableEdges
+       * @param {Function} options.onEdgeClick
+       * @param {Function} options.onSquareClick
+       */
+      function createBoardSvg(options) {
+        const {
+          entrance = null,
+          exit = null,
+          visibleWalls = new Set(),
+          visibleOpen = new Set(),
+          tokenPos = null,
+          flashWall = null,
+          onSquareClick = null
+        } = options;
+
+        const margin = 50;
+        const cellSize = 90;
+        const totalSize = 640;
+
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', `0 0 ${totalSize} ${totalSize}`);
+        svg.setAttribute('class', 'board-svg');
+        svg.setAttribute('role', 'img');
+        svg.setAttribute('aria-label', '6 by 6 Labyrinth Board');
+
+        // 1. Column coordinate labels (Top & Bottom)
+        for (let c = 0; c < SIZE; c++) {
+          const x = margin + c * cellSize + cellSize / 2;
+
+          // Top
+          const textTop = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          textTop.setAttribute('x', x);
+          textTop.setAttribute('y', 28);
+          textTop.setAttribute('class', 'svg-coord-label');
+          textTop.textContent = COLS[c];
+          svg.appendChild(textTop);
+
+          // Bottom
+          const textBot = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          textBot.setAttribute('x', x);
+          textBot.setAttribute('y', totalSize - 22);
+          textBot.setAttribute('class', 'svg-coord-label');
+          textBot.textContent = COLS[c];
+          svg.appendChild(textBot);
+        }
+
+        // 2. Row coordinate labels (Left & Right)
+        for (let r = 0; r < SIZE; r++) {
+          const y = margin + r * cellSize + cellSize / 2;
+
+          // Left
+          const textLeft = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          textLeft.setAttribute('x', 24);
+          textLeft.setAttribute('y', y);
+          textLeft.setAttribute('class', 'svg-coord-label');
+          textLeft.textContent = String(r + 1);
+          svg.appendChild(textLeft);
+
+          // Right
+          const textRight = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          textRight.setAttribute('x', totalSize - 24);
+          textRight.setAttribute('y', y);
+          textRight.setAttribute('class', 'svg-coord-label');
+          textRight.textContent = String(r + 1);
+          svg.appendChild(textRight);
+        }
+
+        // 3. Grid squares
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            const sqLabel = label(r, c);
+            const x = margin + c * cellSize;
+            const y = margin + r * cellSize;
+
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', x);
+            rect.setAttribute('y', y);
+            rect.setAttribute('width', cellSize);
+            rect.setAttribute('height', cellSize);
+            rect.setAttribute('class', 'svg-cell');
+            rect.setAttribute('data-square', sqLabel);
+
+            if (onSquareClick) {
+              rect.style.cursor = 'pointer';
+              rect.addEventListener('click', () => onSquareClick(sqLabel));
+            }
+
+            svg.appendChild(rect);
+          }
+        }
+
+        // 4. Outer border frame
+        const frame = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        frame.setAttribute('x', margin);
+        frame.setAttribute('y', margin);
+        frame.setAttribute('width', SIZE * cellSize);
+        frame.setAttribute('height', SIZE * cellSize);
+        frame.setAttribute('class', 'svg-grid-border');
+        svg.appendChild(frame);
+
+        // 5. Entrance "IN" tag
+        if (entrance) {
+          const p = parse(entrance);
+          if (p) {
+            const x = margin + p.col * cellSize + 6;
+            const y = margin + p.row * cellSize + 6;
+
+            const tagRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            tagRect.setAttribute('x', x);
+            tagRect.setAttribute('y', y);
+            tagRect.setAttribute('width', 28);
+            tagRect.setAttribute('height', 18);
+            tagRect.setAttribute('fill', '#141216');
+            tagRect.setAttribute('stroke', '#c9a24a');
+            tagRect.setAttribute('class', 'svg-tag-rect');
+            svg.appendChild(tagRect);
+
+            const tagText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            tagText.setAttribute('x', x + 14);
+            tagText.setAttribute('y', y + 9);
+            tagText.setAttribute('fill', '#c9a24a');
+            tagText.setAttribute('class', 'svg-tag-text');
+            tagText.textContent = 'IN';
+            svg.appendChild(tagText);
+          }
+        }
+
+        // 6. Exit "OUT" tag
+        if (exit) {
+          const p = parse(exit);
+          if (p) {
+            const x = margin + p.col * cellSize + cellSize - 36;
+            const y = margin + p.row * cellSize + 6;
+
+            const tagRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            tagRect.setAttribute('x', x);
+            tagRect.setAttribute('y', y);
+            tagRect.setAttribute('width', 30);
+            tagRect.setAttribute('height', 18);
+            tagRect.setAttribute('fill', '#141216');
+            tagRect.setAttribute('stroke', '#c0182f');
+            tagRect.setAttribute('class', 'svg-tag-rect');
+            svg.appendChild(tagRect);
+
+            const tagText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            tagText.setAttribute('x', x + 15);
+            tagText.setAttribute('y', y + 9);
+            tagText.setAttribute('fill', '#c0182f');
+            tagText.setAttribute('class', 'svg-tag-text');
+            tagText.textContent = 'OUT';
+            svg.appendChild(tagText);
+          }
+        }
+
+        // 7. Known Open passages (dashed connectors)
+        if (visibleOpen && visibleOpen.size > 0) {
+          visibleOpen.forEach(ek => {
+            const parts = ek.split('-');
+            const p1 = parse(parts[0]);
+            const p2 = parse(parts[1]);
+            if (p1 && p2) {
+              const x1 = margin + p1.col * cellSize + cellSize / 2;
+              const y1 = margin + p1.row * cellSize + cellSize / 2;
+              const x2 = margin + p2.col * cellSize + cellSize / 2;
+              const y2 = margin + p2.row * cellSize + cellSize / 2;
+
+              const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+              line.setAttribute('x1', x1);
+              line.setAttribute('y1', y1);
+              line.setAttribute('x2', x2);
+              line.setAttribute('y2', y2);
+              line.setAttribute('class', 'svg-passage');
+              svg.appendChild(line);
+            }
+          });
+        }
+
+        // 8. Visible Walls (revealed or own maze)
+        if (visibleWalls && visibleWalls.size > 0) {
+          visibleWalls.forEach(ek => {
+            const parts = ek.split('-');
+            const p1 = parse(parts[0]);
+            const p2 = parse(parts[1]);
+            if (p1 && p2) {
+              const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+
+              // Vertical edge (horizontal step)
+              if (p1.row === p2.row) {
+                const minCol = Math.min(p1.col, p2.col);
+                const x = margin + (minCol + 1) * cellSize;
+                const y1 = margin + p1.row * cellSize + 3;
+                const y2 = margin + (p1.row + 1) * cellSize - 3;
+                line.setAttribute('x1', x);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x);
+                line.setAttribute('y2', y2);
+              } else {
+                // Horizontal edge (vertical step)
+                const minRow = Math.min(p1.row, p2.row);
+                const y = margin + (minRow + 1) * cellSize;
+                const x1 = margin + p1.col * cellSize + 3;
+                const x2 = margin + (p1.col + 1) * cellSize - 3;
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y);
+              }
+
+              let cls = 'svg-wall';
+              if (flashWall && flashWall === ek) {
+                cls += ' svg-wall-flash';
+              }
+              line.setAttribute('class', cls);
+              svg.appendChild(line);
+            }
+          });
+        }
+
+        // 9. Token (Gold ring with dark center)
+        if (tokenPos) {
+          const p = parse(tokenPos);
+          if (p) {
+            const cx = margin + p.col * cellSize + cellSize / 2;
+            const cy = margin + p.row * cellSize + cellSize / 2;
+
+            const outer = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            outer.setAttribute('cx', cx);
+            outer.setAttribute('cy', cy);
+            outer.setAttribute('r', 21);
+            outer.setAttribute('class', 'svg-token-outer');
+            svg.appendChild(outer);
+
+            const inner = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            inner.setAttribute('cx', cx);
+            inner.setAttribute('cy', cy);
+            inner.setAttribute('r', 7.5);
+            inner.setAttribute('class', 'svg-token-inner');
+            svg.appendChild(inner);
+          }
+        }
+
+        return svg;
+      }
+
+      /* ==========================================================================
+         6. STATE MACHINE ROUTING & RENDERERS (Section 6)
+         ========================================================================== */
+      const appEl = document.getElementById('app');
+
+      /**
+       * Safe helper to set text content
+       */
+      function el(tag, className = '', text = '') {
+        const elem = document.createElement(tag);
+        if (className) elem.className = className;
+        if (text) elem.textContent = text;
+        return elem;
+      }
+
+      /**
+       * Primary state transition dispatcher
+       */
+      function setPhase(newPhase) {
+        state.phase = newPhase;
+        state.currentMessage = { text: '', type: 'normal' };
+        render();
+      }
+
+      /**
+       * Master render entry point
+       */
+      function render() {
+        appEl.innerHTML = '';
+
+        switch (state.phase) {
+          case 'TITLE':
+            renderTitleScreen();
+            break;
+          case 'RULES':
+            renderRulesScreen();
+            break;
+          case 'HANDOFF':
+            renderHandoffScreen();
+            break;
+          case 'BUILD':
+            renderBuildScreen();
+            break;
+          case 'COINFLIP':
+            renderCoinflipScreen();
+            break;
+          case 'SOLVE':
+            renderSolveScreen();
+            break;
+          case 'GAMEOVER':
+            renderGameoverScreen();
+            break;
+          default:
+            renderTitleScreen();
+        }
+      }
+
+      /* --------------------------------------------------------------------------
+         6.1 TITLE SCREEN
+         -------------------------------------------------------------------------- */
+      function renderTitleScreen() {
+        const container = el('div', 'flex flex-col items-center w-full');
+        container.style.width = '100%';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.alignItems = 'center';
+        container.style.paddingTop = '2rem';
+
+        const kicker = el('div', 'kicker', 'Two Architects · Blind Duel · One Escape');
+        const title = el('h1', '', 'LABYRINTH');
+        const subtitle = el('p', 'subtitle', 'Two enter the darkness. Only the unseen path survives.');
+
+        const formCard = el('div', 'panel');
+        formCard.style.width = '100%';
+        formCard.style.maxWidth = '420px';
+        formCard.style.background = 'var(--panel)';
+        formCard.style.border = '1px solid var(--line)';
+        formCard.style.borderRadius = '6px';
+        formCard.style.padding = '1.8rem';
+        formCard.style.marginTop = '2.5rem';
+        formCard.style.boxShadow = '0 10px 30px rgba(0,0,0,0.8)';
+
+        // Player 1 input
+        const p1Group = el('div');
+        p1Group.style.marginBottom = '1.2rem';
+        const p1Label = el('label', 'kicker', 'Architect I');
+        p1Label.style.display = 'block';
+        p1Label.style.textAlign = 'left';
+        p1Label.style.marginBottom = '0.3rem';
+        const p1Input = el('input', 'input-field');
+        p1Input.type = 'text';
+        p1Input.value = state.names[0];
+        p1Input.maxLength = 14;
+        p1Input.autocomplete = 'off';
+        p1Group.appendChild(p1Label);
+        p1Group.appendChild(p1Input);
+
+        // Player 2 input
+        const p2Group = el('div');
+        p2Group.style.marginBottom = '1.8rem';
+        const p2Label = el('label', 'kicker', 'Architect II');
+        p2Label.style.display = 'block';
+        p2Label.style.textAlign = 'left';
+        p2Label.style.marginBottom = '0.3rem';
+        const p2Input = el('input', 'input-field');
+        p2Input.type = 'text';
+        p2Input.value = state.names[1];
+        p2Input.maxLength = 14;
+        p2Input.autocomplete = 'off';
+        p2Group.appendChild(p2Label);
+        p2Group.appendChild(p2Input);
+
+        // Error message container
+        const errMsg = el('div', 'status-msg');
+        errMsg.style.display = 'none';
+
+        // Action buttons
+        const btnGroup = el('div');
+        btnGroup.style.display = 'flex';
+        btnGroup.style.flexDirection = 'column';
+        btnGroup.style.gap = '0.8rem';
+
+        const beginBtn = el('button', 'btn btn-gold', 'Begin Duel');
+        beginBtn.type = 'button';
+        beginBtn.addEventListener('click', () => {
+          const n1 = p1Input.value.trim();
+          const n2 = p2Input.value.trim();
+
+          if (!n1 || !n2) {
+            errMsg.textContent = 'Both architect names must be provided.';
+            errMsg.className = 'status-msg error';
+            errMsg.style.display = 'block';
+            return;
+          }
+          if (n1.toLowerCase() === n2.toLowerCase()) {
+            errMsg.textContent = 'Architect names must be different from each other.';
+            errMsg.className = 'status-msg error';
+            errMsg.style.display = 'block';
+            return;
+          }
+
+          state.names[0] = n1;
+          state.names[1] = n2;
+
+          // Reset mazes and solves
+          state.mazes = [
+            { entrance: null, exit: null, walls: new Set() },
+            { entrance: null, exit: null, walls: new Set() }
+          ];
+          state.solves = [
+            { pos: null, knownOpen: new Set(), knownWalls: new Set(), guesses: 0, log: [] },
+            { pos: null, knownOpen: new Set(), knownWalls: new Set(), guesses: 0, log: [] }
+          ];
+          state.winner = null;
+
+          // Start with Player 1 build
+          state.current = 0;
+          state.handoffTarget = 0;
+          state.handoffNextPhase = 'BUILD';
+          setPhase('HANDOFF');
+        });
+
+        const rulesBtn = el('button', 'btn btn-ghost', 'How to Play');
+        rulesBtn.type = 'button';
+        rulesBtn.addEventListener('click', () => {
+          state.returnTo = 'TITLE';
+          setPhase('RULES');
+        });
+
+        btnGroup.appendChild(beginBtn);
+        btnGroup.appendChild(rulesBtn);
+
+        formCard.appendChild(p1Group);
+        formCard.appendChild(p2Group);
+        formCard.appendChild(errMsg);
+        formCard.appendChild(btnGroup);
+
+        container.appendChild(kicker);
+        container.appendChild(title);
+        container.appendChild(subtitle);
+        container.appendChild(formCard);
+
+        appEl.appendChild(container);
+        p1Input.focus();
+      }
+
+      /* --------------------------------------------------------------------------
+         6.2 RULES SCREEN (Section 8 - Beginner-Friendly Tutorial)
+         -------------------------------------------------------------------------- */
+      function renderRulesScreen() {
+        const container = el('div');
+        container.style.width = '100%';
+        container.style.maxWidth = '580px';
+
+        const topBar = el('div', 'top-bar');
+        const brand = el('div', 'top-bar-brand', 'HOW TO PLAY');
+        const closeBtn = el('button', 'btn btn-ghost', 'Back');
+        closeBtn.addEventListener('click', () => {
+          setPhase(state.returnTo || 'TITLE');
+        });
+        topBar.appendChild(brand);
+        topBar.appendChild(closeBtn);
+
+        const rulesBox = el('div', 'rules-panel');
+
+        // Quick-Start 3-Step Banner for Absolute Beginners
+        const quickstart = el('div', 'rules-quickstart');
+        
+        const qs1 = el('div', 'rules-step');
+        qs1.appendChild(el('span', 'rules-step-badge', '1'));
+        const qs1Text = el('div');
+        qs1Text.innerHTML = '<strong>Secretly Build:</strong> Hand the device between players. Each person sets an entrance (<strong>IN</strong>), an exit (<strong>OUT</strong>), and places 20 hidden walls.';
+        qs1.appendChild(qs1Text);
+
+        const qs2 = el('div', 'rules-step');
+        qs2.appendChild(el('span', 'rules-step-badge', '2'));
+        const qs2Text = el('div');
+        qs2Text.innerHTML = '<strong>Take Blind Turns:</strong> You try to solve your rival\'s maze without seeing their walls. Open moves let you keep walking; hitting a wall reveals it and ends your turn.';
+        qs2.appendChild(qs2Text);
+
+        const qs3 = el('div', 'rules-step');
+        qs3.appendChild(el('span', 'rules-step-badge', '3'));
+        const qs3Text = el('div');
+        qs3Text.innerHTML = '<strong>First Out Wins:</strong> The first architect whose token reaches the opponent\'s <strong>OUT</strong> square wins the match!';
+        qs3.appendChild(qs3Text);
+
+        quickstart.appendChild(qs1);
+        quickstart.appendChild(qs2);
+        quickstart.appendChild(qs3);
+        rulesBox.appendChild(quickstart);
+
+        // Section 1: The Goal
+        const s1 = el('div', 'rules-section');
+        const h1 = el('h3', 'rules-heading', '1. The Goal of the Game');
+        const p1 = el('p', 'rules-text', 'Two players share one screen. Player 1 crafts a secret maze for Player 2, and Player 2 crafts a secret maze for Player 1. Then you take turns walking blindly through the other player\'s maze. The opponent\'s walls are completely invisible until you bump into them. First player to reach the exit square wins!');
+        s1.appendChild(h1);
+        s1.appendChild(p1);
+
+        // Section 2: Notation & Coordinates (Reading the Board)
+        const s2 = el('div', 'rules-section');
+        const h2 = el('h3', 'rules-heading', '2. Reading the Board (Columns & Rows)');
+        const p2 = el('p', 'rules-text', 'The board is a simple 6x6 grid, just like a chessboard or Battleship:');
+        const p2b = el('p', 'rules-text');
+        p2b.innerHTML = '• <strong>Columns (left to right)</strong> are letters <strong>A, B, C, D, E, F</strong>.<br>• <strong>Rows (top to bottom)</strong> are numbers <strong>1, 2, 3, 4, 5, 6</strong>.<br>• Any square is named by combining its letter and number: <strong>A1</strong> is top-left, <strong>F6</strong> is bottom-right, and <strong>C3</strong> is near the center.';
+
+        // Static mini diagram for notation
+        const diagSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        diagSvg.setAttribute('viewBox', '0 0 240 240');
+        diagSvg.style.width = '200px';
+        diagSvg.style.height = '200px';
+        diagSvg.style.margin = '0.75rem auto';
+        diagSvg.style.display = 'block';
+
+        const m = 24, cs = 32;
+        for (let c = 0; c < 6; c++) {
+          const tT = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          tT.setAttribute('x', m + c * cs + cs / 2);
+          tT.setAttribute('y', 14);
+          tT.setAttribute('class', 'svg-coord-label');
+          tT.style.fontSize = '10px';
+          tT.textContent = COLS[c];
+          diagSvg.appendChild(tT);
+
+          const tB = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          tB.setAttribute('x', m + c * cs + cs / 2);
+          tB.setAttribute('y', 234);
+          tB.setAttribute('class', 'svg-coord-label');
+          tB.style.fontSize = '10px';
+          tB.textContent = COLS[c];
+          diagSvg.appendChild(tB);
+        }
+        for (let r = 0; r < 6; r++) {
+          const tL = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          tL.setAttribute('x', 12);
+          tL.setAttribute('y', m + r * cs + cs / 2);
+          tL.setAttribute('class', 'svg-coord-label');
+          tL.style.fontSize = '10px';
+          tL.textContent = String(r + 1);
+          diagSvg.appendChild(tL);
+
+          const tR = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          tR.setAttribute('x', 228);
+          tR.setAttribute('y', m + r * cs + cs / 2);
+          tR.setAttribute('class', 'svg-coord-label');
+          tR.style.fontSize = '10px';
+          tR.textContent = String(r + 1);
+          diagSvg.appendChild(tR);
+
+          for (let c = 0; c < 6; c++) {
+            const sq = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            sq.setAttribute('x', m + c * cs);
+            sq.setAttribute('y', m + r * cs);
+            sq.setAttribute('width', cs);
+            sq.setAttribute('height', cs);
+            // Highlight C3 as an example
+            if (r === 2 && c === 2) {
+              sq.setAttribute('fill', '#261f2d');
+              sq.setAttribute('stroke', '#c9a24a');
+              sq.setAttribute('stroke-width', '1.2');
+            } else {
+              sq.setAttribute('fill', '#141216');
+              sq.setAttribute('stroke', '#8a6f33');
+              sq.setAttribute('stroke-width', '0.5');
+              sq.setAttribute('stroke-opacity', '0.35');
+            }
+            diagSvg.appendChild(sq);
+          }
+        }
+        // Label C3 on the diagram
+        const labelC3 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        labelC3.setAttribute('x', m + 2 * cs + cs / 2);
+        labelC3.setAttribute('y', m + 2 * cs + cs / 2 + 1);
+        labelC3.setAttribute('fill', '#c9a24a');
+        labelC3.setAttribute('class', 'svg-coord-label');
+        labelC3.style.fontSize = '9px';
+        labelC3.style.fontWeight = 'bold';
+        labelC3.textContent = 'C3';
+        diagSvg.appendChild(labelC3);
+
+        s2.appendChild(h2);
+        s2.appendChild(p2);
+        s2.appendChild(p2b);
+        s2.appendChild(diagSvg);
+
+        // Section 3: Taking a Turn (Open vs Blocked)
+        const s3 = el('div', 'rules-section');
+        const h3 = el('h3', 'rules-heading', '3. How Taking a Turn Works');
+        const p3 = el('p', 'rules-text', 'Your token starts at the entrance. Each turn, you choose one neighboring square (Up, Down, Left, or Right) to step into. No diagonal moves are allowed! One of two things happens:');
+
+        const callouts = el('div', 'rules-callout-grid');
+
+        const cardOpen = el('div', 'rules-card-open');
+        const openTitle = el('div', 'rules-card-title', '🟢 When a step is OPEN');
+        const openDesc = el('div');
+        openDesc.innerHTML = '• There is no wall in your way.<br>• Your gold ring slides forward to that square.<br>• <strong>YOU KEEP YOUR TURN!</strong> You get to immediately pick another step.';
+        cardOpen.appendChild(openTitle);
+        cardOpen.appendChild(openDesc);
+
+        const cardBlocked = el('div', 'rules-card-blocked');
+        const blkTitle = el('div', 'rules-card-title', '🔴 When a step is BLOCKED');
+        const blkDesc = el('div');
+        blkDesc.innerHTML = '• You bumped into a secret wall!<br>• That wall is permanently drawn on your map in red.<br>• A <strong>BLOCKED</strong> stamp appears and <strong>your turn ends</strong>. Pass the screen to your rival.';
+        cardBlocked.appendChild(blkTitle);
+        cardBlocked.appendChild(blkDesc);
+
+        callouts.appendChild(cardOpen);
+        callouts.appendChild(cardBlocked);
+        s3.appendChild(h3);
+        s3.appendChild(p3);
+        s3.appendChild(callouts);
+
+        // Section 4: Worked Example
+        const s4 = el('div', 'rules-section');
+        const h4 = el('h3', 'rules-heading', '4. A Simple Worked Example');
+        const p4 = el('p', 'rules-text', 'Here is how a real turn plays out in practice:');
+        
+        const exList = el('div');
+        exList.style.fontSize = '0.88rem';
+        exList.style.lineHeight = '1.6';
+        exList.style.marginBottom = '0.5rem';
+        exList.innerHTML = `
+          1. <strong>Starting Square:</strong> Your token sits on <strong>C3</strong>.<br>
+          2. <strong>First Step:</strong> You type or tap <strong>B3</strong> (one step to the left).<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;→ <em>Result:</em> <span style="color:var(--gold); font-weight:bold;">OPEN</span>. Your token advances to B3. You still have the turn!<br>
+          3. <strong>Second Step:</strong> Next, you try moving down to <strong>B4</strong>.<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;→ <em>Result:</em> <span style="color:var(--crimson-bright); font-weight:bold;">BLOCKED</span>. An unseen wall stands between B3 and B4. It lights up in red on your map, and your turn ends.<br>
+          4. <strong>Device Handoff:</strong> You hand the device to Player 2.
+        `;
+        s4.appendChild(h4);
+        s4.appendChild(p4);
+        s4.appendChild(exList);
+
+        // Example diagram (showing C3 -> B3 open, B3 -> B4 blocked wall)
+        const exSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        exSvg.setAttribute('viewBox', '0 0 200 160');
+        exSvg.style.width = '200px';
+        exSvg.style.height = '160px';
+        exSvg.style.margin = '0.5rem auto';
+        exSvg.style.display = 'block';
+
+        const ecs = 44, emX = 34, emY = 14;
+        for (let r = 0; r < 3; r++) {
+          for (let c = 0; c < 3; c++) {
+            const sq = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            sq.setAttribute('x', emX + c * ecs);
+            sq.setAttribute('y', emY + r * ecs);
+            sq.setAttribute('width', ecs);
+            sq.setAttribute('height', ecs);
+            sq.setAttribute('fill', '#141216');
+            sq.setAttribute('stroke', '#8a6f33');
+            sq.setAttribute('stroke-width', '0.5');
+            sq.setAttribute('stroke-opacity', '0.4');
+            exSvg.appendChild(sq);
+          }
+        }
+
+        // Row/Col labels on mini diagram: cols A, B, C; rows 2, 3, 4
+        const miniCols = ['A', 'B', 'C'];
+        const miniRows = ['2', '3', '4'];
+        for (let c = 0; c < 3; c++) {
+          const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          t.setAttribute('x', emX + c * ecs + ecs / 2);
+          t.setAttribute('y', 10);
+          t.setAttribute('class', 'svg-coord-label');
+          t.style.fontSize = '8px';
+          t.textContent = miniCols[c];
+          exSvg.appendChild(t);
+        }
+        for (let r = 0; r < 3; r++) {
+          const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          t.setAttribute('x', emX - 10);
+          t.setAttribute('y', emY + r * ecs + ecs / 2);
+          t.setAttribute('class', 'svg-coord-label');
+          t.style.fontSize = '8px';
+          t.textContent = miniRows[r];
+          exSvg.appendChild(t);
+        }
+
+        // Dashed passage between C3 (r=1, c=2) and B3 (r=1, c=1)
+        const pLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        pLine.setAttribute('x1', emX + 2 * ecs + ecs / 2);
+        pLine.setAttribute('y1', emY + 1 * ecs + ecs / 2);
+        pLine.setAttribute('x2', emX + 1 * ecs + ecs / 2);
+        pLine.setAttribute('y2', emY + 1 * ecs + ecs / 2);
+        pLine.setAttribute('class', 'svg-passage');
+        exSvg.appendChild(pLine);
+
+        // "OPEN" text over dashed line
+        const openText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        openText.setAttribute('x', emX + 1.5 * ecs);
+        openText.setAttribute('y', emY + 1 * ecs - 4);
+        openText.setAttribute('fill', '#8ae392');
+        openText.setAttribute('class', 'svg-coord-label');
+        openText.style.fontSize = '8px';
+        openText.textContent = 'OPEN';
+        exSvg.appendChild(openText);
+
+        // Wall between B3 (r=1, c=1) and B4 (r=2, c=1)
+        const wLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        wLine.setAttribute('x1', emX + 1 * ecs + 2);
+        wLine.setAttribute('y1', emY + 2 * ecs);
+        wLine.setAttribute('x2', emX + 2 * ecs - 2);
+        wLine.setAttribute('y2', emY + 2 * ecs);
+        wLine.setAttribute('class', 'svg-wall');
+        exSvg.appendChild(wLine);
+
+        // "WALL" label next to red wall
+        const blkText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        blkText.setAttribute('x', emX + 1 * ecs + ecs / 2);
+        blkText.setAttribute('y', emY + 2 * ecs + 10);
+        blkText.setAttribute('fill', '#ff526a');
+        blkText.setAttribute('class', 'svg-coord-label');
+        blkText.style.fontSize = '8px';
+        blkText.style.fontWeight = 'bold';
+        blkText.textContent = 'BLOCKED!';
+        exSvg.appendChild(blkText);
+
+        // Token at B3
+        const tok = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        tok.setAttribute('cx', emX + 1 * ecs + ecs / 2);
+        tok.setAttribute('cy', emY + 1 * ecs + ecs / 2);
+        tok.setAttribute('r', 11);
+        tok.setAttribute('class', 'svg-token-outer');
+        exSvg.appendChild(tok);
+
+        s4.appendChild(exSvg);
+
+        // Section 5: Building Your Labyrinth
+        const s5 = el('div', 'rules-section');
+        const h5 = el('h3', 'rules-heading', '5. Building Your Maze (No Stress!)');
+        const p5 = el('p', 'rules-text');
+        p5.innerHTML = `
+          Before the duel begins, each player secretly builds their maze:<br>
+          • <strong>Set Entrance (IN):</strong> Type <code>entrance A1</code> (or tap a square on the board).<br>
+          • <strong>Set Exit (OUT):</strong> Type <code>exit F6</code> (or tap another square).<br>
+          • <strong>Place 20 Walls:</strong> Type pairs like <code>A3-B3</code> to place a wall between them.<br>
+          • <strong>Remove a Wall:</strong> Tap the small <strong>×</strong> on any wall tag below the board.
+        `;
+
+        const tipBox = el('div', 'rules-note-box');
+        tipBox.innerHTML = `
+          💡 <strong>Beginner Shortcut:</strong> Don't feel like typing 20 walls? Just tap the <strong>"Random"</strong> button! It instantly builds a completely fair, solvable labyrinth for you. You can tweak it or confirm right away.
+        `;
+
+        const fairBox = el('div', 'rules-note-box');
+        fairBox.innerHTML = `
+          ⚖️ <strong>Solvability Rule:</strong> You cannot completely wall off your exit! The game automatically checks that a path from IN to OUT exists before letting you lock in your maze.
+        `;
+
+        s5.appendChild(h5);
+        s5.appendChild(p5);
+        s5.appendChild(tipBox);
+        s5.appendChild(fairBox);
+
+        // Section 6: Privacy Etiquette
+        const s6 = el('div', 'rules-section');
+        const h6 = el('h3', 'rules-heading', '6. Pass-and-Play Privacy');
+        const p6 = el('p', 'rules-text', 'Whenever a turn finishes or a wall is hit, a pitch-black curtain appears with the message: "PASS THE DEVICE TO [NAME]". Hand over the screen before clicking ready. No peeking at your opponent\'s hidden layout—honor is everything in this duel!');
+        s6.appendChild(h6);
+        s6.appendChild(p6);
+
+        // Section 7: Beginner Controls Summary
+        const s7 = el('div', 'rules-section');
+        const h7 = el('h3', 'rules-heading', '7. Easy Controls');
+        const p7 = el('p', 'rules-text');
+        p7.innerHTML = `
+          • <strong>Tap to Move:</strong> In Solve mode, you can tap neighboring squares directly on the board to move—typing is optional!<br>
+          • <strong>Press Enter:</strong> If typing, type a square (e.g. <code>B3</code>) and press Enter.<br>
+          • <strong>Close Rules:</strong> Press the <strong>Escape</strong> key anytime or tap the "Return to Game" button below.
+        `;
+        s7.appendChild(h7);
+        s7.appendChild(p7);
+
+        // Bottom Back button
+        const backBtnBottom = el('button', 'btn btn-gold w-full', 'Return to Game');
+        backBtnBottom.style.width = '100%';
+        backBtnBottom.style.marginTop = '1rem';
+        backBtnBottom.addEventListener('click', () => {
+          setPhase(state.returnTo || 'TITLE');
+        });
+
+        rulesBox.appendChild(s1);
+        rulesBox.appendChild(s2);
+        rulesBox.appendChild(s3);
+        rulesBox.appendChild(s4);
+        rulesBox.appendChild(s5);
+        rulesBox.appendChild(s6);
+        rulesBox.appendChild(s7);
+        rulesBox.appendChild(backBtnBottom);
+
+        container.appendChild(topBar);
+        container.appendChild(rulesBox);
+        appEl.appendChild(container);
+
+        function handleKey(e) {
+          if (e.key === 'Escape') {
+            window.removeEventListener('keydown', handleKey);
+            setPhase(state.returnTo || 'TITLE');
+          }
+        }
+        window.addEventListener('keydown', handleKey, { once: true });
+      }
+
+      /* --------------------------------------------------------------------------
+         6.3 HANDOFF SCREEN (Privacy Curtain - Section 6.3)
+         -------------------------------------------------------------------------- */
+      function renderHandoffScreen() {
+        // While curtain is shown, no sensitive board DOM exists!
+        const curtain = el('div', 'handoff-curtain');
+        const targetName = state.names[state.handoffTarget];
+
+        const kicker = el('div', 'kicker', 'Pass-and-Play Security Curtain');
+        const title = el('h1', 'curtain-title', `PASS THE DEVICE TO ${targetName.toUpperCase()}`);
+        const desc = el('p', 'curtain-desc', 'Avert your eyes. Only the active architect may witness their labyrinth and infiltration log.');
+
+        const readyBtn = el('button', 'btn btn-gold', `I am ${targetName}, ready`);
+        readyBtn.style.minWidth = '240px';
+        readyBtn.addEventListener('click', () => {
+          state.current = state.handoffTarget;
+          setPhase(state.handoffNextPhase);
+        });
+
+        curtain.appendChild(kicker);
+        curtain.appendChild(title);
+        curtain.appendChild(desc);
+        curtain.appendChild(readyBtn);
+
+        appEl.appendChild(curtain);
+        readyBtn.focus();
+      }
+
+      /* --------------------------------------------------------------------------
+         6.4 BUILD SCREEN (Section 6.4, 7.1-7.3)
+         -------------------------------------------------------------------------- */
+      function renderBuildScreen() {
+        const pIdx = state.current;
+        const pName = state.names[pIdx];
+        const maze = state.mazes[pIdx];
+
+        const container = el('div');
+        container.style.width = '100%';
+        container.style.maxWidth = '560px';
+
+        // Top bar with Rules trigger
+        const topBar = el('div', 'top-bar');
+        const architectTitle = el('div', 'top-bar-brand', `${pName.toUpperCase()}'S MAZE`);
+        const rulesBtn = el('button', 'btn btn-ghost btn-icon', '?');
+        rulesBtn.title = 'How to Play';
+        rulesBtn.addEventListener('click', () => {
+          state.returnTo = 'BUILD';
+          setPhase('RULES');
+        });
+        topBar.appendChild(architectTitle);
+        topBar.appendChild(rulesBtn);
+        container.appendChild(topBar);
+
+        // Subtitle instructions
+        const instructions = el('div', 'kicker', 'Set entrance, exit, and exactly 20 walls');
+        container.appendChild(instructions);
+
+        // Counters Header
+        const counterBar = el('div');
+        counterBar.style.display = 'flex';
+        counterBar.style.justifyContent = 'space-between';
+        counterBar.style.fontSize = '0.85rem';
+        counterBar.style.color = 'var(--gold-dim)';
+        counterBar.style.marginBottom = '0.4rem';
+        counterBar.style.padding = '0 0.2rem';
+
+        const wallCounter = el('span', '', `Walls: ${maze.walls.size}/${WALL_COUNT}`);
+        if (maze.walls.size === WALL_COUNT) {
+          wallCounter.style.color = 'var(--ok)';
+          wallCounter.style.fontWeight = 'bold';
+        }
+        const entCounter = el('span', '', `IN: ${maze.entrance || 'None'}`);
+        const extCounter = el('span', '', `OUT: ${maze.exit || 'None'}`);
+
+        counterBar.appendChild(wallCounter);
+        counterBar.appendChild(entCounter);
+        counterBar.appendChild(extCounter);
+        container.appendChild(counterBar);
+
+        // Live Preview Board
+        const boardWrapper = el('div', 'board-wrapper');
+        const boardSvg = createBoardSvg({
+          entrance: maze.entrance,
+          exit: maze.exit,
+          visibleWalls: maze.walls,
+          onSquareClick: (sq) => {
+            // Quick set entrance or exit if not set, or prefill input
+            if (!maze.entrance) {
+              maze.entrance = sq;
+              renderBuildScreen();
+            } else if (!maze.exit && sq !== maze.entrance) {
+              maze.exit = sq;
+              renderBuildScreen();
+            } else {
+              const input = document.getElementById('build-input');
+              if (input) {
+                if (!input.value) {
+                  input.value = sq + '-';
+                  input.focus();
+                } else if (input.value.endsWith('-')) {
+                  input.value = input.value + sq;
+                  handleBuildSubmit(input.value);
+                }
+              }
+            }
+          }
+        });
+        boardWrapper.appendChild(boardSvg);
+        container.appendChild(boardWrapper);
+
+        // Status message
+        const statusBox = el('div', 'status-msg', state.currentMessage.text);
+        if (state.currentMessage.type === 'error') {
+          statusBox.className = 'status-msg error';
+        } else if (state.currentMessage.type === 'success') {
+          statusBox.className = 'status-msg success';
+        }
+        container.appendChild(statusBox);
+
+        // Input Form
+        const form = el('form', 'action-bar');
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const val = inputField.value.trim();
+          handleBuildSubmit(val);
+        };
+
+        const inputField = el('input', 'input-field');
+        inputField.id = 'build-input';
+        inputField.type = 'text';
+        inputField.placeholder = 'e.g. entrance A1, exit F6, or A3-B3';
+        inputField.autocapitalize = 'off';
+        inputField.autocomplete = 'off';
+        inputField.autocorrect = 'off';
+        inputField.spellcheck = false;
+        inputField.enterKeyHint = 'go';
+
+        const submitBtn = el('button', 'btn btn-gold', 'Add');
+        submitBtn.type = 'submit';
+
+        form.appendChild(inputField);
+        form.appendChild(submitBtn);
+        container.appendChild(form);
+
+        // Removable Wall Chips Panel
+        if (maze.walls.size > 0) {
+          const chipsPanel = el('div', 'chips-panel');
+          const chipsHeader = el('div', 'kicker');
+          chipsHeader.style.textAlign = 'left';
+          chipsHeader.style.marginBottom = '0.35rem';
+          chipsHeader.textContent = `Active Walls (${maze.walls.size}):`;
+          chipsPanel.appendChild(chipsHeader);
+
+          const chipsList = el('div', 'chips-list');
+          const sortedWalls = Array.from(maze.walls).sort();
+          sortedWalls.forEach(w => {
+            const chip = el('span', 'wall-chip');
+            const chipText = el('span', '', w);
+            const chipX = el('button', 'wall-chip-btn', '×');
+            chipX.type = 'button';
+            chipX.title = `Remove ${w}`;
+            chipX.addEventListener('click', () => {
+              maze.walls.delete(w);
+              state.currentMessage = { text: `Removed wall ${w}.`, type: 'normal' };
+              renderBuildScreen();
+            });
+            chip.appendChild(chipText);
+            chip.appendChild(chipX);
+            chipsList.appendChild(chip);
+          });
+          chipsPanel.appendChild(chipsList);
+          container.appendChild(chipsPanel);
+        }
+
+        // Action Toolbar (Random, Clear, Confirm)
+        const toolbar = el('div');
+        toolbar.style.display = 'grid';
+        toolbar.style.gridTemplateColumns = '1fr 1fr 2fr';
+        toolbar.style.gap = '0.5rem';
+        toolbar.style.marginTop = '0.5rem';
+
+        const randomBtn = el('button', 'btn btn-ghost', 'Random');
+        randomBtn.type = 'button';
+        randomBtn.title = 'Generate valid random labyrinth';
+        randomBtn.addEventListener('click', () => {
+          const rm = randomMaze();
+          maze.entrance = rm.entrance;
+          maze.exit = rm.exit;
+          maze.walls = rm.walls;
+          state.currentMessage = { text: 'Random solvable labyrinth generated.', type: 'success' };
+          renderBuildScreen();
+        });
+
+        const clearBtn = el('button', 'btn btn-ghost', 'Clear');
+        clearBtn.type = 'button';
+        clearBtn.addEventListener('click', () => {
+          showConfirmationModal('Clear all walls and points from this maze?', () => {
+            maze.entrance = null;
+            maze.exit = null;
+            maze.walls.clear();
+            state.currentMessage = { text: 'Maze reset.', type: 'normal' };
+            renderBuildScreen();
+          });
+        });
+
+        const confirmBtn = el('button', 'btn btn-gold', 'Confirm Maze');
+        confirmBtn.type = 'button';
+        const isReady = (maze.entrance && maze.exit && maze.walls.size === WALL_COUNT);
+        confirmBtn.disabled = !isReady;
+
+        confirmBtn.addEventListener('click', () => {
+          if (!maze.entrance || !maze.exit) {
+            state.currentMessage = { text: 'Entrance and exit must both be set.', type: 'error' };
+            renderBuildScreen();
+            return;
+          }
+          if (maze.entrance === maze.exit) {
+            state.currentMessage = { text: 'Entrance and exit must be different squares.', type: 'error' };
+            renderBuildScreen();
+            return;
+          }
+          if (maze.walls.size !== WALL_COUNT) {
+            state.currentMessage = { text: `Place exactly 20 walls. You have ${maze.walls.size}.`, type: 'error' };
+            renderBuildScreen();
+            return;
+          }
+          // Validate BFS solvability
+          if (!bfsSolvable(maze.entrance, maze.exit, maze.walls)) {
+            state.currentMessage = { text: 'No route from entrance to exit. Remove some walls.', type: 'error' };
+            renderBuildScreen();
+            return;
+          }
+
+          // Maze valid and locked in!
+          if (state.current === 0) {
+            // Player 1 confirmed -> Pass to Player 2
+            state.handoffTarget = 1;
+            state.handoffNextPhase = 'BUILD';
+            setPhase('HANDOFF');
+          } else {
+            // Player 2 confirmed -> Coin Flip
+            setPhase('COINFLIP');
+          }
+        });
+
+        toolbar.appendChild(randomBtn);
+        toolbar.appendChild(clearBtn);
+        toolbar.appendChild(confirmBtn);
+        container.appendChild(toolbar);
+
+        appEl.appendChild(container);
+        inputField.focus();
+
+        // Build command handler
+        function handleBuildSubmit(raw) {
+          if (!raw) return;
+          const lower = raw.trim().toLowerCase();
+
+          // Clear shortcut
+          if (lower === 'clear') {
+            showConfirmationModal('Clear all walls and points from this maze?', () => {
+              maze.entrance = null;
+              maze.exit = null;
+              maze.walls.clear();
+              state.currentMessage = { text: 'Maze reset.', type: 'normal' };
+              renderBuildScreen();
+            });
+            return;
+          }
+
+          // Random shortcut
+          if (lower === 'random') {
+            const rm = randomMaze();
+            maze.entrance = rm.entrance;
+            maze.exit = rm.exit;
+            maze.walls = rm.walls;
+            state.currentMessage = { text: 'Random solvable labyrinth generated.', type: 'success' };
+            renderBuildScreen();
+            return;
+          }
+
+          // Entrance command: "entrance a1", "in a1"
+          const entMatch = lower.match(/^(?:entrance|in)\s*[:=]?\s*([a-f][1-6])$/);
+          if (entMatch) {
+            const targetSq = entMatch[1].toUpperCase();
+            if (maze.exit && maze.exit === targetSq) {
+              state.currentMessage = { text: 'Entrance and exit must be different squares.', type: 'error' };
+            } else {
+              maze.entrance = targetSq;
+              state.currentMessage = { text: `Entrance set to ${targetSq}.`, type: 'success' };
+            }
+            renderBuildScreen();
+            return;
+          }
+
+          // Exit command: "exit f6", "out f6"
+          const extMatch = lower.match(/^(?:exit|out)\s*[:=]?\s*([a-f][1-6])$/);
+          if (extMatch) {
+            const targetSq = extMatch[1].toUpperCase();
+            if (maze.entrance && maze.entrance === targetSq) {
+              state.currentMessage = { text: 'Entrance and exit must be different squares.', type: 'error' };
+            } else {
+              maze.exit = targetSq;
+              state.currentMessage = { text: `Exit set to ${targetSq}.`, type: 'success' };
+            }
+            renderBuildScreen();
+            return;
+          }
+
+          // Remove command: "remove a3-b3", "delete a3-b3"
+          const rmMatch = lower.match(/^(?:remove|delete|rm)\s+([a-f0-9\s\u2013\u2014-]*)$/);
+          if (rmMatch) {
+            const res = parseEdgeInput(rmMatch[1]);
+            if (!res.ok) {
+              state.currentMessage = { text: res.message, type: 'error' };
+            } else if (!maze.walls.has(res.edgeKey)) {
+              state.currentMessage = { text: 'That wall does not exist.', type: 'error' };
+            } else {
+              maze.walls.delete(res.edgeKey);
+              state.currentMessage = { text: `Removed wall ${res.edgeKey}.`, type: 'normal' };
+            }
+            renderBuildScreen();
+            return;
+          }
+
+          // Wall placement: "a3-b3", "a3 - b3", "a3–b3", "a3 b3"
+          const edgeRes = parseEdgeInput(lower);
+          if (edgeRes.ok) {
+            const ek = edgeRes.edgeKey;
+            if (maze.walls.has(ek)) {
+              state.currentMessage = { text: 'That wall already exists.', type: 'error' };
+            } else if (maze.walls.size >= WALL_COUNT) {
+              state.currentMessage = { text: 'You have already placed 20 walls.', type: 'error' };
+            } else {
+              maze.walls.add(ek);
+              state.currentMessage = { text: `Wall ${ek} placed. (${maze.walls.size}/${WALL_COUNT})`, type: 'success' };
+            }
+            renderBuildScreen();
+            return;
+          }
+
+          // If square only e.g. "A1"
+          if (/^[a-f][1-6]$/.test(lower)) {
+            state.currentMessage = {
+              text: `Specify "entrance ${lower.toUpperCase()}" or "exit ${lower.toUpperCase()}".`,
+              type: 'error'
+            };
+            renderBuildScreen();
+            return;
+          }
+
+          state.currentMessage = { text: edgeRes.message, type: 'error' };
+          renderBuildScreen();
+        }
+      }
+
+      /* --------------------------------------------------------------------------
+         6.5 COIN FLIP SCREEN (Section 6.5)
+         -------------------------------------------------------------------------- */
+      function renderCoinflipScreen() {
+        const container = el('div');
+        container.style.width = '100%';
+        container.style.maxWidth = '480px';
+        container.style.textAlign = 'center';
+        container.style.paddingTop = '1.5rem';
+
+        const kicker = el('div', 'kicker', 'Arbitration by Lot');
+        const title = el('h1', '', 'THE COIN OF FATE');
+        const desc = el('p', 'subtitle', 'Deciding who infiltrates the dark first...');
+
+        container.appendChild(kicker);
+        container.appendChild(title);
+        container.appendChild(desc);
+
+        // Decide first solver
+        const first = Math.random() < 0.5 ? 0 : 1;
+        state.firstSolver = first;
+        state.current = first;
+
+        // Initialize solvers starting positions
+        state.solves[0].pos = state.mazes[1].entrance;
+        state.solves[1].pos = state.mazes[0].entrance;
+
+        // 3D Coin element
+        const coinWrapper = el('div', 'coin-wrapper');
+        const coin = el('div', 'coin');
+        // Rotate 1800deg for Player 1, 1980deg for Player 2
+        const targetDeg = first === 0 ? 1800 : 1980;
+        coin.style.setProperty('--coin-target-deg', `${targetDeg}deg`);
+
+        const frontFace = el('div', 'coin-face front');
+        frontFace.appendChild(el('div', 'coin-symbol', 'I'));
+        frontFace.appendChild(el('div', 'coin-tag', state.names[0]));
+
+        const backFace = el('div', 'coin-face back');
+        backFace.appendChild(el('div', 'coin-symbol', 'II'));
+        backFace.appendChild(el('div', 'coin-tag', state.names[1]));
+
+        coin.appendChild(frontFace);
+        coin.appendChild(backFace);
+        coinWrapper.appendChild(coin);
+        container.appendChild(coinWrapper);
+
+        // Result container
+        const resultBanner = el('div');
+        resultBanner.style.minHeight = '60px';
+        resultBanner.style.margin = '1rem 0';
+
+        const winnerText = el('h2', '', `${state.names[first].toUpperCase()} GOES FIRST`);
+        winnerText.style.color = 'var(--gold)';
+        winnerText.style.opacity = '0';
+        winnerText.style.transition = 'opacity 300ms ease';
+        resultBanner.appendChild(winnerText);
+        container.appendChild(resultBanner);
+
+        const proceedBtn = el('button', 'btn btn-gold', 'Enter the Labyrinth');
+        proceedBtn.style.opacity = '0';
+        proceedBtn.style.transition = 'opacity 300ms ease';
+        proceedBtn.disabled = true;
+
+        proceedBtn.addEventListener('click', () => {
+          state.handoffTarget = first;
+          state.handoffNextPhase = 'SOLVE';
+          setPhase('HANDOFF');
+        });
+        container.appendChild(proceedBtn);
+
+        appEl.appendChild(container);
+
+        // Reveal text after coin animation (~1.2s)
+        const motionReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const delay = motionReduced ? 50 : 1250;
+
+        setTimeout(() => {
+          winnerText.style.opacity = '1';
+          proceedBtn.style.opacity = '1';
+          proceedBtn.disabled = false;
+          proceedBtn.focus();
+        }, delay);
+      }
+
+      /* --------------------------------------------------------------------------
+         6.6 SOLVE SCREEN (Section 6.6, 7.4-7.6)
+         -------------------------------------------------------------------------- */
+      function renderSolveScreen() {
+        const solverIdx = state.current;
+        const solverName = state.names[solverIdx];
+        const opponentIdx = 1 - solverIdx;
+        const opponentName = state.names[opponentIdx];
+
+        const opponentMaze = state.mazes[opponentIdx];
+        const solveState = state.solves[solverIdx];
+
+        const container = el('div');
+        container.style.width = '100%';
+        container.style.maxWidth = '560px';
+
+        // Top bar
+        const topBar = el('div', 'top-bar');
+        const turnTitle = el('div', 'top-bar-brand', `${solverName.toUpperCase()}'S TURN`);
+        const rulesBtn = el('button', 'btn btn-ghost btn-icon', '?');
+        rulesBtn.title = 'Rules';
+        rulesBtn.addEventListener('click', () => {
+          state.returnTo = 'SOLVE';
+          setPhase('RULES');
+        });
+        topBar.appendChild(turnTitle);
+        topBar.appendChild(rulesBtn);
+        container.appendChild(topBar);
+
+        // Infiltration HUD
+        const hud = el('div');
+        hud.style.display = 'flex';
+        hud.style.justifyContent = 'space-between';
+        hud.style.fontSize = '0.85rem';
+        hud.style.color = 'var(--gold-dim)';
+        hud.style.marginBottom = '0.4rem';
+        hud.style.padding = '0 0.2rem';
+
+        const posTag = el('span', '', `Position: ${solveState.pos}`);
+        posTag.style.color = 'var(--gold)';
+        posTag.style.fontWeight = 'bold';
+        const exitTag = el('span', '', `Exit: ${opponentMaze.exit}`);
+        exitTag.style.color = 'var(--crimson-bright)';
+        const guessTag = el('span', '', `Guesses: ${solveState.guesses}`);
+
+        hud.appendChild(posTag);
+        hud.appendChild(exitTag);
+        hud.appendChild(guessTag);
+        container.appendChild(hud);
+
+        // Solver's Private Board (ONLY knownOpen and knownWalls rendered)
+        // UNREVEALED WALLS ARE NEVER RENDERED!
+        const boardWrapper = el('div', 'board-wrapper');
+        const boardSvg = createBoardSvg({
+          entrance: opponentMaze.entrance,
+          exit: opponentMaze.exit,
+          visibleWalls: solveState.knownWalls,
+          visibleOpen: solveState.knownOpen,
+          tokenPos: solveState.pos,
+          onSquareClick: (sq) => {
+            const input = document.getElementById('step-input');
+            if (input) {
+              input.value = sq;
+              input.focus();
+            }
+          }
+        });
+        boardWrapper.appendChild(boardSvg);
+
+        // BLOCKED ink stamp overlay if momentarily active
+        if (state.blockedStampActive) {
+          const stampOverlay = el('div', 'blocked-stamp-overlay');
+          const stamp = el('div', 'ink-stamp', 'BLOCKED');
+          stampOverlay.appendChild(stamp);
+          boardWrapper.appendChild(stampOverlay);
+        }
+
+        container.appendChild(boardWrapper);
+
+        // Status Message Banner
+        const statusBox = el('div', 'status-msg', state.currentMessage.text || `Step to an adjacent square to infiltrate ${opponentName}'s maze.`);
+        if (state.currentMessage.type === 'error') {
+          statusBox.className = 'status-msg error';
+        } else if (state.currentMessage.type === 'success') {
+          statusBox.className = 'status-msg success';
+        } else if (state.currentMessage.type === 'blocked') {
+          statusBox.className = 'status-msg blocked';
+        }
+        container.appendChild(statusBox);
+
+        // Step Input Form
+        const form = el('form', 'action-bar');
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          if (state.blockedStampActive) return;
+          const val = inputField.value.trim();
+          handleSolveStep(val);
+        };
+
+        const inputField = el('input', 'input-field');
+        inputField.id = 'step-input';
+        inputField.type = 'text';
+        inputField.placeholder = `Step to adjacent square (e.g. ${neighbors(solveState.pos)[0] || 'B3'})`;
+        inputField.autocapitalize = 'off';
+        inputField.autocomplete = 'off';
+        inputField.autocorrect = 'off';
+        inputField.spellcheck = false;
+        inputField.enterKeyHint = 'go';
+
+        const stepBtn = el('button', 'btn btn-gold', 'Step');
+        stepBtn.type = 'submit';
+
+        form.appendChild(inputField);
+        form.appendChild(stepBtn);
+        container.appendChild(form);
+
+        // Move Log (Section 7.6 - aria-live="polite", only solver's own log)
+        const logPanel = el('div', 'log-panel');
+        logPanel.setAttribute('aria-live', 'polite');
+        logPanel.setAttribute('aria-relevant', 'additions');
+
+        const logTitle = el('div', 'log-title');
+        logTitle.appendChild(el('span', '', `${solverName}'s Log`));
+        logTitle.appendChild(el('span', '', `${solveState.log.length} steps`));
+        logPanel.appendChild(logTitle);
+
+        const logList = el('ul', 'log-items');
+        if (solveState.log.length === 0) {
+          const emptyLog = el('li', 'log-entry');
+          emptyLog.style.color = 'var(--muted)';
+          emptyLog.textContent = 'No steps taken yet.';
+          logList.appendChild(emptyLog);
+        } else {
+          solveState.log.forEach(entry => {
+            const isBlk = entry.includes('BLOCKED');
+            const item = el('li', `log-entry ${isBlk ? 'blocked' : 'open'}`, entry);
+            logList.appendChild(item);
+          });
+        }
+        logPanel.appendChild(logList);
+        container.appendChild(logPanel);
+
+        appEl.appendChild(container);
+        if (!state.blockedStampActive) {
+          inputField.focus();
+        }
+
+        // Solve step executor
+        function handleSolveStep(targetStr) {
+          const curPos = solveState.pos;
+          const res = resolveMove(targetStr, curPos, opponentMaze.walls, opponentMaze.exit);
+
+          // 1 & 2: Malformed or Not Adjacent -> Reject without penalty
+          if (res.status === 'MALFORMED' || res.status === 'NOT_ADJACENT') {
+            state.currentMessage = { text: res.message, type: 'error' };
+            renderSolveScreen();
+            return;
+          }
+
+          // 3: BLOCKED by wall
+          if (res.status === 'BLOCKED') {
+            solveState.knownWalls.add(res.edge);
+            solveState.guesses++;
+            const logEntry = `${curPos} -> ${res.target} BLOCKED`;
+            solveState.log.unshift(logEntry);
+
+            state.currentMessage = { text: res.message, type: 'blocked' };
+            state.blockedStampActive = true;
+            renderSolveScreen();
+
+            // After stamp display (~1.4s), transition to HANDOFF for other player
+            const nextPlayer = 1 - solverIdx;
+            const timer = setTimeout(() => {
+              state.blockedStampActive = false;
+              state.handoffTarget = nextPlayer;
+              state.handoffNextPhase = 'SOLVE';
+              setPhase('HANDOFF');
+            }, 1400);
+
+            // Clicking board/stamp dismisses immediately
+            document.querySelector('.blocked-stamp-overlay')?.addEventListener('click', () => {
+              clearTimeout(timer);
+              state.blockedStampActive = false;
+              state.handoffTarget = nextPlayer;
+              state.handoffNextPhase = 'SOLVE';
+              setPhase('HANDOFF');
+            }, { once: true });
+
+            return;
+          }
+
+          // 4: Step SUCCEEDS
+          if (res.status === 'OPEN') {
+            solveState.knownOpen.add(res.edge);
+            solveState.pos = res.target;
+            solveState.guesses++;
+            const logEntry = `${curPos} -> ${res.target} OPEN`;
+            solveState.log.unshift(logEntry);
+
+            // 5: Check win condition
+            if (res.isWin) {
+              state.winner = solverIdx;
+              state.phase = 'GAMEOVER';
+              state.currentMessage = { text: `${solverName} reaches the exit. ${solverName} wins.`, type: 'success' };
+              render();
+              return;
+            }
+
+            state.currentMessage = { text: res.message, type: 'success' };
+            renderSolveScreen();
+          }
+        }
+      }
+
+      /* --------------------------------------------------------------------------
+         6.7 GAME OVER SCREEN (Section 6.7, 7.7)
+         -------------------------------------------------------------------------- */
+      function renderGameoverScreen() {
+        const winnerIdx = state.winner;
+        const winnerName = state.names[winnerIdx];
+
+        const container = el('div');
+        container.style.width = '100%';
+        container.style.maxWidth = '640px';
+        container.style.textAlign = 'center';
+
+        const kicker = el('div', 'kicker', 'Duel Concluded · Arbitrated');
+        const title = el('h1', '', `${winnerName.toUpperCase()} VICTORIOUS`);
+        const subtitle = el('p', 'subtitle', `${winnerName} breached the opponent's labyrinth in ${state.solves[winnerIdx].guesses} moves.`);
+
+        container.appendChild(kicker);
+        container.appendChild(title);
+        container.appendChild(subtitle);
+
+        // Reveal Both Full Mazes side by side (or stacked)
+        const mazesGrid = el('div', 'gameover-mazes');
+
+        // Card 1: Player 1 Maze & Infiltration by Player 2
+        const card1 = el('div', 'maze-card');
+        const c1Title = el('div', 'maze-card-title', `${state.names[0].toUpperCase()}'S LABYRINTH`);
+        const c1Sub = el('div', 'stat-badge', `Infiltrated by ${state.names[1]} (${state.solves[1].guesses} moves)`);
+        const c1SvgWrapper = el('div', 'board-wrapper');
+        // Render Player 1's maze with ALL walls, plus Player 2's known path and token
+        const c1Svg = createBoardSvg({
+          entrance: state.mazes[0].entrance,
+          exit: state.mazes[0].exit,
+          visibleWalls: state.mazes[0].walls,
+          visibleOpen: state.solves[1].knownOpen,
+          tokenPos: state.solves[1].pos
+        });
+        c1SvgWrapper.appendChild(c1Svg);
+        card1.appendChild(c1Title);
+        card1.appendChild(c1Sub);
+        card1.appendChild(c1SvgWrapper);
+
+        // Player 2's move log summary
+        const c1Log = el('div', 'log-panel');
+        c1Log.style.maxHeight = '100px';
+        const c1LogList = el('ul', 'log-items');
+        state.solves[1].log.forEach(e => {
+          c1LogList.appendChild(el('li', `log-entry ${e.includes('BLOCKED') ? 'blocked' : 'open'}`, e));
+        });
+        c1Log.appendChild(c1LogList);
+        card1.appendChild(c1Log);
+        mazesGrid.appendChild(card1);
+
+        // Card 2: Player 2 Maze & Infiltration by Player 1
+        const card2 = el('div', 'maze-card');
+        const c2Title = el('div', 'maze-card-title', `${state.names[1].toUpperCase()}'S LABYRINTH`);
+        const c2Sub = el('div', 'stat-badge', `Infiltrated by ${state.names[0]} (${state.solves[0].guesses} moves)`);
+        const c2SvgWrapper = el('div', 'board-wrapper');
+        // Render Player 2's maze with ALL walls, plus Player 1's known path and token
+        const c2Svg = createBoardSvg({
+          entrance: state.mazes[1].entrance,
+          exit: state.mazes[1].exit,
+          visibleWalls: state.mazes[1].walls,
+          visibleOpen: state.solves[0].knownOpen,
+          tokenPos: state.solves[0].pos
+        });
+        c2SvgWrapper.appendChild(c2Svg);
+        card2.appendChild(c2Title);
+        card2.appendChild(c2Sub);
+        card2.appendChild(c2SvgWrapper);
+
+        // Player 1's move log summary
+        const c2Log = el('div', 'log-panel');
+        c2Log.style.maxHeight = '100px';
+        const c2LogList = el('ul', 'log-items');
+        state.solves[0].log.forEach(e => {
+          c2LogList.appendChild(el('li', `log-entry ${e.includes('BLOCKED') ? 'blocked' : 'open'}`, e));
+        });
+        c2Log.appendChild(c2LogList);
+        card2.appendChild(c2Log);
+        mazesGrid.appendChild(card2);
+
+        container.appendChild(mazesGrid);
+
+        // Rematch & New Game Buttons
+        const actionRow = el('div');
+        actionRow.style.display = 'flex';
+        actionRow.style.justifyContent = 'center';
+        actionRow.style.gap = '1rem';
+        actionRow.style.margin = '1rem 0';
+
+        const rematchBtn = el('button', 'btn btn-gold', 'Rematch');
+        rematchBtn.addEventListener('click', () => {
+          // Keep same names, reset mazes and solves
+          state.mazes = [
+            { entrance: null, exit: null, walls: new Set() },
+            { entrance: null, exit: null, walls: new Set() }
+          ];
+          state.solves = [
+            { pos: null, knownOpen: new Set(), knownWalls: new Set(), guesses: 0, log: [] },
+            { pos: null, knownOpen: new Set(), knownWalls: new Set(), guesses: 0, log: [] }
+          ];
+          state.winner = null;
+          state.current = 0;
+          state.handoffTarget = 0;
+          state.handoffNextPhase = 'BUILD';
+          setPhase('HANDOFF');
+        });
+
+        const newGameBtn = el('button', 'btn btn-ghost', 'New Game');
+        newGameBtn.addEventListener('click', () => {
+          setPhase('TITLE');
+        });
+
+        actionRow.appendChild(rematchBtn);
+        actionRow.appendChild(newGameBtn);
+        container.appendChild(actionRow);
+
+        appEl.appendChild(container);
+      }
+
+      /* --------------------------------------------------------------------------
+         7. CONFIRMATION MODAL HELPER
+         -------------------------------------------------------------------------- */
+      function showConfirmationModal(questionText, onConfirm) {
+        const backdrop = el('div', 'modal-backdrop');
+        const box = el('div', 'modal-box');
+
+        const title = el('h3', 'kicker', 'Confirmation Required');
+        const q = el('p', 'rules-text', questionText);
+        q.style.margin = '1rem 0';
+
+        const row = el('div');
+        row.style.display = 'flex';
+        row.style.gap = '0.8rem';
+        row.style.justifyContent = 'center';
+
+        const cancelBtn = el('button', 'btn btn-ghost', 'Cancel');
+        cancelBtn.addEventListener('click', () => {
+          backdrop.remove();
+        });
+
+        const yesBtn = el('button', 'btn btn-crimson', 'Clear All');
+        yesBtn.addEventListener('click', () => {
+          backdrop.remove();
+          onConfirm();
+        });
+
+        row.appendChild(cancelBtn);
+        row.appendChild(yesBtn);
+
+        box.appendChild(title);
+        box.appendChild(q);
+        box.appendChild(row);
+        backdrop.appendChild(box);
+        document.body.appendChild(backdrop);
+        cancelBtn.focus();
+      }
+
+      // Initial boot
+      render();
+    })();
+  </script>
+</body>
+</html>

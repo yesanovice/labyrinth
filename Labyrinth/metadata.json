@@ -1,0 +1,6 @@
+{
+  "name": "Labyrinth - Blind Maze Duel",
+  "description": "A high-stakes two-player pass-and-play blind maze duel. Secretly build mazes on a 6x6 grid and duel blind to reach the exit.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
